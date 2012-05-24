@@ -1,8 +1,8 @@
-  var DEFAULT_WIDTH = "560",
-      DEFAULT_HEIGHT = "315";
+  var DEFAULT_WIDTH = "200",
+      DEFAULT_HEIGHT = "200";
 
   var __youTubeReadyListeners = [],
-      __oldYouTubeReadyListener
+      __oldYouTubeReadyListener,
       __urlRegex = /^.*(?:\/|v=)(.{11})/;
 
   // Fire the things that were waiting
@@ -46,11 +46,14 @@
           container = document.createElement( "div" ),
           src = __urlRegex.exec( media.src )[ 1 ],
           query = ( media.src.split( "?" )[ 1 ] || "" ).replace( /v=.{11}/, "" ),
-          autoPlay = ( /autoplay=1/.test( query ) );
+          autoPlay = ( /autoplay=1/.test( query ) ),
           width = media.style.width ? "" + media.offsetWidth : DEFAULT_WIDTH,
-          height = media.style.height ? "" + media.offsetHeight : DEFAULT_HEIGHT
+          height = media.style.height ? "" + media.offsetHeight : DEFAULT_HEIGHT,
           currentTime = 0,
           
+          _shouldPlay = -1,
+          _playerReady = false,
+
           _startCurrentTime = options.start || 0,
           _startMuted = false,
           _startVolume = 0,
@@ -68,14 +71,14 @@
           lastVolume = 100,
           
           playerVars = {
-            autohide: (options.autohide == undefined ? 2 : options.autohide),
-            autoplay: (options.autoplay == undefined ? 0 : options.autoplay),
-            controls: (options.controls == undefined ? 1 : options.controls),
-            modestbranding: (options.modestbranding == undefined ? 0 : options.modestbranding),
-            loop: (options.loop == undefined ? 0 : options.loop),
-            playlist: (options.playlist == undefined ? '' : options.playlist),
-            start: (options.start == undefined ? 0 : options.start),
-            theme: (options.theme == undefined ? 'dark' : options.theme)
+            autohide: (options.autohide === undefined ? 2 : options.autohide),
+            autoplay: (options.autoplay === undefined ? 0 : options.autoplay),
+            controls: (options.controls === undefined ? 1 : options.controls),
+            modestbranding: (options.modestbranding === undefined ? 0 : options.modestbranding),
+            loop: (options.loop === undefined ? 0 : options.loop),
+            playlist: (options.playlist === undefined ? '' : options.playlist),
+            start: (options.start === undefined ? 0 : options.start),
+            theme: (options.theme === undefined ? 'dark' : options.theme)
           };
 
       media.readyState = 0; //NOTHING
@@ -90,43 +93,69 @@
       media.appendChild( container );
 
       function update() {
-        var val = options.youtubeObject.getVolume() / 100;
+        if ( !_playerReady ) {
+	  return;
+        }
+
+        var youtubeObject = options.youtubeObject;
+
+        var val = youtubeObject.getVolume() / 100;
         if ( _volume !== val ) {
           _volume = val;
           media.dispatchEvent( "volumechange" );
         } //if
-        currentTime = options.youtubeObject.getCurrentTime();
+        currentTime = youtubeObject.getCurrentTime();
         if ( seeking && seeking === currentTime ) {
           seeking = false;
           media.dispatchEvent( "seeked" );
         } //if
         media.dispatchEvent( "timeupdate" );
-        if ( media.networkState !== 1 && options.youtubeObject.getVideoBytesLoaded() === options.youtubeObject.getVideoBytesTotal() ) {
+        if ( media.networkState !== 1 &&
+             youtubeObject.getVideoBytesLoaded() === youtubeObject.getVideoBytesTotal() ) {
           media.networkState = 1; //IDLE
         } //if
       } //update
 
       function onPlayerReady( e ) {
-      	if(autoPlay)
+        _playerReady = true;
+
+        if ( autoPlay ) {
       	  media.paused = false;
+        }
+
       	media.readyState = 4;
         media.dispatchEvent( "canplay" );
         media.dispatchEvent( "canplaythrough" );
         media.dispatchEvent( "loadeddata" );
+
         Object.defineProperties( media, {
           currentTime: {
             set: function( val ) {
               // make sure val is a number
-	          currentTime = seekTime = +val;
-	          seeking = true;
+	      currentTime = seekTime = +val;
+	      seeking = true;
 	
-	          if ( options.destroyed ) {
-	            return currentTime;
-	          }
-	          media.dispatchEvent( "seeked" );
-	          media.dispatchEvent( "timeupdate" );
-	          options.youtubeObject.seekTo( currentTime );
-	          return currentTime;
+	      if ( options.destroyed ) {
+	        return currentTime;
+	      }
+              if ( !_playerReady ) {
+                console.log('currentTime - player not ready yet, bailing...');
+              }
+
+              function watchForSeeked() {
+console.log('watchForSeeked');
+                if ( options.youtubeObject.getCurrentTime() === val ) {
+                  media.dispatchEvent( "seeked" );
+    	          media.dispatchEvent( "timeupdate" );
+                }
+                setTimeout( watchForSeeked, 10 );
+              }
+
+	      options.youtubeObject.seekTo( currentTime );
+	      media.dispatchEvent( "seeking" );
+              watchForSeeked();
+
+	      return currentTime;
             },
             get: function() {
               return currentTime;
@@ -180,15 +209,18 @@
         // set the mute and volume, but not currentTime since it should happen automagically
         media.muted = _startMuted;
         media.volume = _startVolume;
-
-        _volumeCheckInterval = setInterval( update, 10 );
-
         media.readyState = 1; //METADATA
         media.networkState = 2; //EMPTY
+
+        if ( _shouldPlay !== -1 ) {
+          _shouldPlay = -1;
+          media.play( _shouldPlay );
+        }
 
       } //onPlayerReady
 
       function onPlayerStateChange( e ) {
+console.log('onPlayerStateChange', e.data);
       	 var state = e.data;
          if ( options.destroyed ) {
             return;
@@ -264,6 +296,10 @@
       function onPlaybackQualityChange( e ) {
       } //onPlaybackQualityChange
 
+      /**
+       * Errors are only returned after calling play() in the
+       * iframe API.
+       **/
       function onError( e ) {
       	 var errorCode = e.data;
       	 if ( [ 2, 100, 101, 150 ].indexOf( errorCode ) !== -1 ) {
@@ -272,11 +308,11 @@
       } //onError
 
       function onYouTubeReady() {
+console.log('src', src);
         options.youtubeObject = new YT.Player( container, {
           height: height,
           width: width,
           videoId: src,
-          playerVars: playerVars,
           events: {
             'onReady': onPlayerReady,
             'onStateChange': onPlayerStateChange,
@@ -287,22 +323,34 @@
       } //onYouTubeReady
 
       media.play = function( time ) {
+         // Time should be 0 or greater
+         time = time|0;
+         time = time >= 0 ? time : 0;
+
       	 if ( options.destroyed ) {
             return;
-          }
+         }
+         if ( !_playerReady ) {
+           _shouldPlay = time ;
+           return;
+         }
 
-          if ( media.paused !== false || options.youtubeObject.getPlayerState() !== 1 ) {
-            media.paused = false;
-            media.dispatchEvent( "play" );
+         if ( media.paused !== false || options.youtubeObject.getPlayerState() !== 1 ) {
+           media.paused = false;
+           media.dispatchEvent( "play" );
+           media.dispatchEvent( "playing" );
+         }
 
-            media.dispatchEvent( "playing" );
-          }
+         if ( time ) {
+           media.currentTime = time;
+         }
 
-          update();
-          options.youtubeObject.playVideo();
+         update();
+         options.youtubeObject.playVideo();
       };
 
       media.pause = function( time ) {
+          // XXXhumph - need to cache calls to pause before player is ready like play()
           if ( options.destroyed ) {
             return;          
           }
@@ -339,6 +387,10 @@
           set: function( val ) {
             _startVolume = val;
           }
+        },
+        play: function( time ) {
+          time = time|0;
+          _shouldPlay = time >= 0 ? time : 0;
         }
       });
 

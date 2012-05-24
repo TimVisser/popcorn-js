@@ -1,3 +1,105 @@
+asyncTest( "YouTube Loads, plays, fires playing event", 1, function() {
+
+  var pop = Popcorn.youtubehtml5( "#video", "http://www.youtube.com/watch?v=nfGV32RNkhw" );
+
+  pop.on( "playing", function() {
+    pop.pause();
+    ok( true, "YouTube loaded and played." );
+    start();
+  });
+
+  pop.play();
+});
+
+
+
+asyncTest( "YouTube seeking triggers seeking event", 1, function() {
+
+  var pop = Popcorn.youtubehtml5( "#video", "http://www.youtube.com/watch?v=nfGV32RNkhw" );
+
+  pop.on( "seeking", function() {
+    pop.pause();
+    ok( true, "YouTube seeing event was dispatched" );
+    start();
+  });
+
+  pop.play().currentTime( 5 );
+});
+
+
+asyncTest( "YouTube Starts at 5s", 3, function() {
+
+  var seeking = false,
+      timeupdate = false;
+
+  var pop = Popcorn.youtubehtml5( "#video", "http://www.youtube.com/watch?v=nfGV32RNkhw" );
+
+  pop.on( "seeking", function() {
+    seeking = true;
+  });
+
+  pop.on( "timeupdate", function() {
+    timeupdate = true;
+  });
+
+  pop.on( "seeked", function() {
+    pop.pause();
+    ok( seeking, "YouTube fired seeking before seeked");
+    ok( timeupdate, "YouTube fired timeupdate before seeked");
+    equal( pop.currentTime(), 5, "YouTube seeked to 5s" );
+    start();
+  });
+
+  pop.play().currentTime( 5 );
+});
+
+
+
+
+asyncTest( "YouTube seeking", 1, function() {
+
+  var pop = Popcorn.youtubehtml5( "#video", "http://www.youtube.com/watch?v=nfGV32RNkhw" );
+
+  pop.on( "seeked", function() {
+    pop.pause();
+    equal( pop.currentTime(), 140, "YouTube seeked to 140s" );
+    start();
+  });
+
+  pop.play();
+  pop.currentTime( 140 );
+});
+
+
+asyncTest( "Player Errors", 1, function() {
+
+//  var pop = Popcorn.youtubehtml5( "#video4", "http://www.youtube.com/watch?v=abcdefghijk", {
+
+  var pop = Popcorn.youtubehtml5( "#video4", "http://www.youtube.com/embed/aaaaaaaaaaa", {
+    events: {
+      error: function() {
+
+        ok( true, "error trigger by invalid URL" );
+        pop.destroy();
+        start();
+      }
+    }
+   });
+   pop.play();
+});
+
+
+
+asyncTest( "Simple Test", 1, function() {
+  var pop1 = Popcorn.youtubehtml5( "#video", "http://www.youtube.com/embed/u1zgFlCw8Aw" );
+  pop1.on( "play", function(){
+    equal( pop1.media.paused, false, "Should be playing" );
+    pop1.destroy();
+    start();
+  });
+  pop1.play();
+});
+
 asyncTest( "Player play, pause, autoplay", function() {
 
   var count = 0,
@@ -20,7 +122,7 @@ asyncTest( "Player play, pause, autoplay", function() {
     }
   }
 
-  pop1 = Popcorn.youtubehtml5( "#video6", "http://www.youtube.com/watch?v=nfGV32RNkhw" );
+  pop1 = Popcorn.youtubehtml5( "#video6", "http://www.youtube.com/embed/u1zgFlCw8Aw" );
 
   pop1.listen( "canplaythrough", function() {
 
@@ -55,6 +157,8 @@ asyncTest( "Player play, pause, autoplay", function() {
   });
 });
 
+
+/**
 asyncTest("Update Timer", function () {
 
   var p2 = Popcorn.youtubehtml5( '#video2', 'http://www.youtube.com/watch?v=nfGV32RNkhw' ),
@@ -222,7 +326,9 @@ asyncTest("Update Timer", function () {
   p2.volume( 0 ).currentTime(3);
 
 });
+**/
 
+/**
 asyncTest("Plugin Factory", function () {
 
   var popped = Popcorn.youtubehtml5( '#video2', 'http://www.youtube.com/watch?v=nfGV32RNkhw' ),
@@ -307,7 +413,7 @@ asyncTest("Plugin Factory", function () {
       ok( typeof popped.media === "object", "video property is a HTMLVideoElement" );
       plus();
 
-      ok( "data" in this, "complicator instance has `data` property" );
+      ok( "da40ta" in this, "complicator instance has `data` property" );
       plus();
       ok( typeof popped.data === "object", "complicator data property is an object" );
       plus();
@@ -339,6 +445,8 @@ asyncTest("Plugin Factory", function () {
   popped.volume( 0 ).currentTime( 0 ).play();
 
 });
+**/
+
 
 asyncTest( "Popcorn YouTube Plugin Url and Duration Tests", function() {
 
@@ -428,6 +536,7 @@ asyncTest( "Popcorn YouTube Plugin Url Regex Test", function() {
   });
 });
 
+/**
 asyncTest( "Controls and Annotations toggling", function() {
 
   var count = 0,
@@ -492,7 +601,9 @@ asyncTest( "Controls and Annotations toggling", function() {
     });
   });
 });
+**/
 
+/**
 asyncTest( "Player height and width", function() {
 
   expect( 4 );
@@ -523,7 +634,9 @@ asyncTest( "Player height and width", function() {
 
   readyStatePoll();
 });
+**/
 
+/**
 asyncTest( "Popcorn Youtube Plugin offsetHeight && offsetWidth Test", function() {
 
   var popped,
@@ -558,34 +671,21 @@ asyncTest( "Popcorn Youtube Plugin offsetHeight && offsetWidth Test", function()
     popped.listen( "loadeddata", runner);
   }
 });
+**/
 
-asyncTest( "Player Errors", function() {
 
-  expect( 1 );
 
-  var pop = Popcorn.youtubehtml5( "#video4", "http://www.youtube.com/watch?v=abcdefghijk", {
-    events: {
-      error: function() {
+asyncTest( "YouTube ended event", 1, function() {
 
-        ok( true, "error trigger by invalid URL" );
-        pop.destroy();
-        start();
-      }
-    }
-   });
-});
-
-asyncTest( "YouTube ended event", function() {
-
-  expect( 1 );
-
-  var pop = Popcorn.youtubehtml5( "#video10", "http://www.youtube.com/watch?v=nfGV32RNkhw" );
+  var pop = Popcorn.youtubehtml5( "#video", "http://www.youtube.com/watch?v=nfGV32RNkhw" );
 
   pop.listen( "ended", function() {
     ok( true, "YouTube is successfully firing the ended event" );
     start();
   });
-  pop.play( 150 );
+
+  pop.currentTime( 140 ).play();
+
 });
 
 asyncTest( "youtube player gets a proper _teardown", function() {
